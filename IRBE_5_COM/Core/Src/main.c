@@ -212,7 +212,7 @@ int main(void)
  SX1278.hw = &SX1278_hw;
 
  //HAL_UART_Receive_DMA(&huart1, &rxBuf, 1); DOESN"T work for some reason
- HAL_UART_Receive_IT(&huart1, &rxBuf, 1); // Works like a charm, but not as good as DMA
+// HAL_UART_Receive_IT(&huart1, &rxBuf, 1); // Works like a charm, but not as good as DMA
  //while(HAL_GPIO_ReadPin(RX_GPIO_Port, RX_Pin) == 0);
  HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
 
@@ -278,6 +278,33 @@ int main(void)
 	//HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
 	memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
 	HAL_ADC_MspInit(&hadc1);
+	if(GSM_InitUart(&huart1)){
+		return 0;
+	}
+	//GPS_init_baudrate(1,  7,  3,  BAUD_RATE_115200,  0);
+	uint8_t ubx_cfg_nav5[28] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01,
+	0x00, 0x00, 0x00, 0xD0, 0x08, 0x00, 0x00, 0x00, 0xC2, 0x01, 0x00, 0x07, 0x00, 0x03, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00}; // UBX COMMAND TO SET GPS BAUDRATE FROM 9600 TO 115200 <- WORKS perfectly.
+
+	/* TODO
+	 * - Commands to change GPS modes Portable -> Airborne [IMPORTANT]
+	 * - Pull data from GPS module (FULL INIT) - optimize [SECONDARY]
+	 * - Improve codes readability for next years successors [IMPORTANT]
+	 * - FIX communication with Borta dators [IMPORTANT]
+	 * - MAKE NEW REVISION OF PCB WITH NEW MICROCONTROLLER - not as powerful [IMPORTANT]
+	 * - Continue;
+	 */
+
+	ChecksumUBLOX(ubx_cfg_nav5);
+
+	//HAL_UART_Transmit_IT(GPS_uart, ubx_cfg_nav5, 28);
+	if(HAL_UART_Transmit(&huart1, ubx_cfg_nav5, 28, 100) == HAL_BUSY){
+		printf("LOL");
+	}
+	MX_USART1_UART_Init_2();
+	HAL_UART_Receive_IT(&huart1, &rxBuf, 1); // Works like a charm, but not as good as DMA
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -725,6 +752,34 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE END USART1_Init 2 */
 
 }
+static void MX_USART1_UART_Init_2(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
 
 /**
   * @brief USART2 Initialization Function

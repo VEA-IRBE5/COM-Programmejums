@@ -1,6 +1,4 @@
 #include "gps.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 uint8_t gpsData[24] = {0}; //0 coord latitude //1 coord longitude "05723.06487N", "02132.70887E"
 uint8_t gpsHeight[8] = {0}; //2 height
@@ -19,10 +17,81 @@ uint8_t gpsTempLen = 255;
 uint8_t isData = 0;
 uint8_t isNewData = 0;
 
-// "000009.7"
-// "00.358"
+UART_HandleTypeDef *GPS_uart;
+
+/* pass UART handle that will communicate with GPS module*/
+uint8_t GPS_init_Uart(UART_HandleTypeDef *huart){
+	GPS_uart = huart;
+	if(huart != GPS_uart){
+		return HAL_ERROR;
+	}else{
+		return HAL_OK;
+	}
+}
 
 
+void GPS_init_baudrate(uint8_t port, uint8_t inProto, uint8_t outProto, uint32_t baud_rate, uint8_t autobaud_ing){
+ //KAS PAR HUINU
+	//"PUBX,41,1,7,3,38400,0*xxCRLF"
+//	char temp[60];
+//	char command[65];
+//	uint16_t size = sprintf (temp, "PUBX,41,%d,%04X,%04X,%lu,%d", port, inProto, outProto, baud_rate, autobaud_ing);
+//	uint8_t checksum = GPS_message_checksum(temp, size);
+//	size = sprintf(command, "%s*%02x, 0r, 0n", temp, checksum);
+//	HAL_UART_Transmit_IT(GPS_uart, (uint8_t *)command, size);
+
+//	uint8_t ubx_cfg_nav5[50] = {
+//	0xB5,0x62,0x06,0x00,port,0x00, 0x00, 0x01, 0x00,
+//	0x00, 0x02, 0x00, 0x00, 0x01, 0xc2, 0x00,0x00, 0x07,0x00, 0x03, 0x00,0x00, 0x00, 0x00};
+
+//	uint8_t ubx_cfg_nav5[50] = {0xb5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0xd0, 0x08, 0x00,
+//	0x00, 0x00, 0xc2, 0x01, 0x00, 0x07, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, /*0x00, 0xc4, 0x96, 0xb5, 0x62,
+//	0x06, 0x00, 0x01, 0x00, 0x01, 0x08, */0x22};
+
+	uint8_t ubx_cfg_nav5[28] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01,
+	0x00, 0x00, 0x00, 0xD0, 0x08, 0x00, 0x00, 0x00, 0xC2, 0x01, 0x00, 0x07, 0x00, 0x03, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00};
+
+	ChecksumUBLOX(ubx_cfg_nav5);
+
+	//HAL_UART_Transmit_IT(GPS_uart, ubx_cfg_nav5, 28);
+	if(HAL_UART_Transmit(GPS_uart, ubx_cfg_nav5, 28, 100) == HAL_BUSY){
+		printf("LOL");
+	}
+}
+
+void Set_Navigation_Engine_To_Airborne(void){
+	uint8_t ubx_cfg_nav5[50] = {
+	0xB5,0x62,0x06,0x24,0x05,0x00,Airborne_2,
+	0x03,0x00,0x06,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00};
+//	size_t buffer_size = sizeof(ubx_cfg_nav5)/sizeof(ubx_cfg_nav5[0]);
+//	size_t buffer_pos = strlen((char *)ubx_cfg_nav5);
+//	uint16_t temp = Fletcher16(ubx_cfg_nav5, strlen((char *)ubx_cfg_nav5));
+//	uint8_t temp_buff[2];
+//	temp_buff[0] = temp;
+//	temp_buff[1] = (temp >> 8);
+//	for(uint8_t i = 0; i < 2; i++)
+//		buffer_pos += write_to_buffer(&ubx_cfg_nav5[buffer_pos], buffer_size - buffer_pos, &temp_buff[i]);
+//	HAL_UART_Transmit_IT(GPS_uart, ubx_cfg_nav5, sizeof(ubx_cfg_nav5));
+}
+
+void ChecksumUBLOX(uint8_t *data){
+	unsigned i, j;
+	uint8_t a = 0, b = 0;
+
+	j = ((unsigned)data[4] + ((unsigned)data[5] << 8) + 6);
+
+	for(i = 2; i < j; i++){
+	a += data[i];
+	b += a;
+	}
+	data[i+0] = a;
+	data[i+1] = b;
+}
 
 /* Pass uint8_t of received data */
 void GPS_Receive(uint8_t data){
@@ -253,6 +322,14 @@ uint8_t GPS_CheckSum(uint8_t *buf, uint8_t len){
 
 	return GPS_NOK;
 
+}
+
+uint8_t GPS_message_checksum(char *message, uint16_t size){
+	uint8_t checksum = 0;
+	for(uint8_t i = 0; i < size; i++){
+		checksum ^= message[i];
+	}
+	 return checksum;
 }
 
 /* converts hex string e.g. AB (0xAB) to byte value writes to value, returns GPS_OK if valid hex */
