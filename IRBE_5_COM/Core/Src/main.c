@@ -45,7 +45,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+ ADC_HandleTypeDef hadc1;
 
 CRC_HandleTypeDef hcrc;
 
@@ -149,6 +149,7 @@ uint8_t UART6_DataBuf[50] = {0};
 uint8_t UART6_RxBuf[50] = {0};
 uint8_t UART6_RxBytes = 4;
 
+uint8_t hallo[255];
 //UART
 
 /* USER CODE END 0 */
@@ -214,7 +215,7 @@ int main(void)
  //HAL_UART_Receive_DMA(&huart1, &rxBuf, 1); DOESN"T work for some reason
 // HAL_UART_Receive_IT(&huart1, &rxBuf, 1); // Works like a charm, but not as good as DMA
  //while(HAL_GPIO_ReadPin(RX_GPIO_Port, RX_Pin) == 0);
- HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
+ //HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
 
  //HAL_UART_Receive_IT(&huart2, UART6_RxBuf, 2);
 
@@ -243,7 +244,7 @@ int main(void)
 	//	uint8_t check_sum;
 	//	uint8_t check_sum_arr[4] = {0, 0, 0, 0};
 
-	uint8_t gsm_dataBuf[80];
+
 	memset(tel_dataBuf, 0, sizeof(tel_dataBuf));
 
 	//HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, 2);
@@ -275,36 +276,68 @@ int main(void)
 	UART6_TxBuf[1] = 0x88;
 	UART6_TxBuf[2] = '*';
 	UART6_TxBuf[3] = get_check_sum((char *)UART6_TxBuf);
-	//HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
+	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
 	memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
 	HAL_ADC_MspInit(&hadc1);
-	if(GSM_InitUart(&huart1)){
+	if (HAL_ADC_Start(&hadc1) != HAL_OK){
+		return HAL_ERROR;
+	}
+	if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) != HAL_OK) {
+		return HAL_ERROR;
+	}
+	if((HAL_ADC_GetState(&hadc1) & HAL_ADC_STATE_REG_EOC) !=  HAL_ADC_STATE_REG_EOC){
+		return HAL_ERROR;
+	}
+	if(GPS_init_Uart(&huart1)){
 		return 0;
 	}
-	//GPS_init_baudrate(1,  7,  3,  BAUD_RATE_115200,  0);
-	uint8_t ubx_cfg_nav5[28] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01,
+
+	/* TODO with GPS module UART1
+	 * - Commands to change GPS modes Portable -> Airborne [IMPORTANT] - done
+	 * - Change baud rate from 9600 to 115200 [IMPORTANT] - done
+	 * - Pull data from GPS module (FULL INIT) - optimize [IMPORTANT]
+	 * - Improve codes readability for next years successors [SECONDARY]
+	 */
+
+	/* TODO with UART6 module
+	* - FIX communication with Borta dators [IMPORTANT] -- Jekabs/Rodrigo [WORST case only Rodrigo - 2 week deadline]
+	*/
+
+	/* TODO with COM PCB
+	* - FIX UART connection between MCU and GPS module (wrongly connected RX - RX and TX - TX)
+	* - Find different MCU (more available and not as powerful)
+	*/
+
+	uint8_t ubx_baud_set[28] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01,
 	0x00, 0x00, 0x00, 0xD0, 0x08, 0x00, 0x00, 0x00, 0xC2, 0x01, 0x00, 0x07, 0x00, 0x03, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00}; // UBX COMMAND TO SET GPS BAUDRATE FROM 9600 TO 115200 <- WORKS perfectly.
 
-	/* TODO
-	 * - Commands to change GPS modes Portable -> Airborne [IMPORTANT]
-	 * - Pull data from GPS module (FULL INIT) - optimize [SECONDARY]
-	 * - Improve codes readability for next years successors [IMPORTANT]
-	 * - FIX communication with Borta dators [IMPORTANT]
-	 * - MAKE NEW REVISION OF PCB WITH NEW MICROCONTROLLER - not as powerful [IMPORTANT]
-	 * - Continue;
-	 */
+	ChecksumUBLOX(ubx_baud_set);
+	HAL_UART_Transmit(&huart1, ubx_baud_set, 28, 1000);
 
-	ChecksumUBLOX(ubx_cfg_nav5);
-
-	//HAL_UART_Transmit_IT(GPS_uart, ubx_cfg_nav5, 28);
-	if(HAL_UART_Transmit(&huart1, ubx_cfg_nav5, 28, 100) == HAL_BUSY){
-		printf("LOL");
+	/* change baud rate for UART1 to 115200 */
+	HAL_UART_Abort_IT(&huart1);
+	HAL_UART_DeInit(&huart1);
+	huart1.Init.BaudRate = 115200;
+	if (HAL_UART_Init(&huart1) != HAL_OK) {
+	    Error_Handler();
 	}
-	MX_USART1_UART_Init_2();
-	HAL_UART_Receive_IT(&huart1, &rxBuf, 1); // Works like a charm, but not as good as DMA
 
+	uint8_t ubx_cfg_nav5[] = {
+	0xB5,0x62,0x06,0x24,0x24,0x00,
+	0x01,0x00,0x06,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x00, 0x00}; //changes to airborne -- won't turn of after 13 km....
+	ChecksumUBLOX(ubx_cfg_nav5);
+	HAL_UART_Transmit(&huart1, ubx_cfg_nav5, sizeof(ubx_cfg_nav5), 1000);
 
+	if (HAL_UART_Receive_DMA(&huart1, hallo, 255) != HAL_OK) {
+	    Error_Handler();
+	}
+
+//	while(GPS_IsData() == GPS_NOK);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -325,16 +358,14 @@ int main(void)
 	}
 	if(do_send_tm){ // its time to send gps coordinates
 		 for(uint8_t tries = 0; tries < 5; tries++){
-			 UART6_RxIsData = 0;
 			 UART6_RxBytes = 4;
-			 memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
-			 HAL_UART_Receive_IT(&huart2, UART6_RxBuf, 4);
+			 HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
 			 memset(UART6_TxBuf, 0, sizeof(UART6_TxBuf));
 			 UART6_TxBuf[0] = 0x03;
 			 UART6_TxBuf[1] = 0x99;
 			 UART6_TxBuf[2] = '*';
 			 UART6_TxBuf[3] = crc_xor((char *)UART6_TxBuf);
-			 HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, 4);
+			 HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, UART6_RxBytes);
 			 //snprintf(UART6_TxBuf + strlen((char *) UART6_TxBuf), sizeof(UART6_TxBuf) - strlen((char *) UART6_TxBuf), "*%d", crc_xor(UART6_TxBuf));
 			 HAL_GPIO_WritePin(LED_0_GPIO_Port, LED_0_Pin, GPIO_PIN_SET);
 			 make_string((char *)tel_dataBuf, sizeof(tel_dataBuf));
@@ -396,6 +427,7 @@ void SystemClock_Config(void)
   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
@@ -411,6 +443,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
@@ -443,6 +476,7 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 1 */
 
   /* USER CODE END ADC1_Init 1 */
+
   /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
   */
   hadc1.Instance = ADC1;
@@ -461,6 +495,7 @@ static void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
+
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
   sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
@@ -752,34 +787,6 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE END USART1_Init 2 */
 
 }
-static void MX_USART1_UART_Init_2(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
 
 /**
   * @brief USART2 Initialization Function
@@ -982,8 +989,10 @@ uint8_t CMD_Parse(uint8_t *buf, uint8_t len){
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	if(huart == &huart1){
-		HAL_UART_Receive_IT(&huart1, &rxBuf, 1);
-		GPS_Receive(rxBuf);
+		//HAL_UART_Receive_IT(&huart1, &rxBuf, 1);
+		HAL_UART_Receive_DMA(&huart1, hallo, 255);
+		//GPS_Receive(hallo);
+		//GPS_Receive(rxBuf);
 		//HAL_UART_Receive_DMA(&huart1, &rxBuf, 1);
 	}
 
@@ -992,7 +1001,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 			uint8_t Parameter = UART6_RxBuf[1];
 
 			if (UART6_RxIsData == 1){
-
+				UART6_RxIsData = 0;
 				UART6_RxIsData = 0;
 				UART6_RxBytes = 4;
 				uint8_t msg_len = strlen((char *)UART6_RxBuf);
@@ -1001,8 +1010,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 						for (uint8_t i = 0; i < (msg_len-2); i++)
 							UART6_DataBuf[i] = UART6_RxBuf[i];
 
-				memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
-				HAL_UART_Receive_IT(&huart2, UART6_RxBuf, UART6_RxBytes);
+				//memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
+				HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
 
 
 			}else{
@@ -1022,7 +1031,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 							 UART6_TxBuf[2] = '*';
 							 UART6_TxBuf[3] = crc_xor((char *)UART6_TxBuf);
 							HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, 4);
-							memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
+							//memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
 						}
 						HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
 					break;
@@ -1039,16 +1048,18 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 			}
 			if(Command != 0x02){
 				UART6_RxBytes = 4;
-				memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
+				//memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
 				HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
 			}
+			 memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
 	}
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart){
 	//HAL_UART_Receive_DMA(&huart1, &rxBuf, 1); doesn't work for some reason...
 	if(huart == &huart1){
-		HAL_UART_Receive_IT(&huart1, &rxBuf, 1);
+		//HAL_UART_Receive_IT(&huart1, &rxBuf, 1);
+		HAL_UART_Receive_DMA(&huart1, hallo, 255);
 	}
 	if(huart == &huart6){
 		memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
@@ -1197,15 +1208,6 @@ void make_string_gsm(char *s, uint8_t size){
 float temp_mcu(void){
 	  float TemperatureValue = 0;
 	  uint16_t value = 0;
-	  if (HAL_ADC_Start(&hadc1) != HAL_OK){
-		return HAL_ERROR;
-	  }
-	  if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) != HAL_OK) {
-	  return HAL_ERROR;
-	  }
-	  if((HAL_ADC_GetState(&hadc1) & HAL_ADC_STATE_REG_EOC) !=  HAL_ADC_STATE_REG_EOC){
-	  return HAL_ERROR;
-	  }
 	  value = HAL_ADC_GetValue(&hadc1);
 	  TemperatureValue = value & 0x0fff;// 12 bit result
 	  TemperatureValue *= 3300;
@@ -1261,4 +1263,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-

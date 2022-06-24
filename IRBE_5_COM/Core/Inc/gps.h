@@ -31,7 +31,7 @@
 #define GPS_OK								1
 #define GPS_NOK								0
 
-void GPS_Receive(uint8_t data);
+void GPS_Receive(uint8_t *data);
 void GPS_GetCoord();
 
 uint8_t GPS_IsData();
@@ -50,6 +50,7 @@ uint8_t GSM_InitUart(UART_HandleTypeDef *huart);
 void GPS_init_baudrate(uint8_t port, uint8_t inProto, uint8_t outProto, uint32_t baud_rate, uint8_t autobaud_ing);
 void Get_Navigation_Engine_Settings(); // 20 byte response
 void Set_Navigation_Engine_To_Airborne(void);
+void Get_Navigation_Engine_To_Airborne(void);
 
 
 uint8_t GPS_Parse(uint8_t *buf, uint8_t len);

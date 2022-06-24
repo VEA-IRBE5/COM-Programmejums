@@ -61,13 +61,22 @@ void GPS_init_baudrate(uint8_t port, uint8_t inProto, uint8_t outProto, uint32_t
 }
 
 void Set_Navigation_Engine_To_Airborne(void){
-	uint8_t ubx_cfg_nav5[50] = {
-	0xB5,0x62,0x06,0x24,0x05,0x00,Airborne_2,
-	0x03,0x00,0x06,0x00,0x00,0x00,0x00,0x00,
+	uint8_t ubx_cfg_nav5[] = {
+	0xB5,0x62,0x06,0x24,0x24,0x00,
+	0x01,0x00,0x06,0x00,0x00,0x00,0x00,0x00,
 	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00};
+	0x00,0x00,0x00,0x00,
+	0x55,0xB4};
+	ChecksumUBLOX(ubx_cfg_nav5);
+	if(HAL_UART_Transmit(GPS_uart, ubx_cfg_nav5, 44, 100) == HAL_BUSY){
+		printf("LOL");
+	}
+	if(HAL_UART_Receive(GPS_uart, ubx_cfg_nav5, 44, 200) == HAL_BUSY){
+		printf("LOL");
+	}
+	HAL_Delay(1);
 //	size_t buffer_size = sizeof(ubx_cfg_nav5)/sizeof(ubx_cfg_nav5[0]);
 //	size_t buffer_pos = strlen((char *)ubx_cfg_nav5);
 //	uint16_t temp = Fletcher16(ubx_cfg_nav5, strlen((char *)ubx_cfg_nav5));
@@ -79,6 +88,21 @@ void Set_Navigation_Engine_To_Airborne(void){
 //	HAL_UART_Transmit_IT(GPS_uart, ubx_cfg_nav5, sizeof(ubx_cfg_nav5));
 }
 
+void Get_Navigation_Engine_To_Airborne(void){
+
+	uint8_t ubx_cfg_nav5[50] = {0xB5,0x62,0x06,0x00};
+	ChecksumUBLOX(ubx_cfg_nav5);
+	if(HAL_UART_Transmit(GPS_uart, ubx_cfg_nav5, 28, 100) == HAL_BUSY){
+		printf("LOL");
+	}
+	if(HAL_UART_Receive(GPS_uart, ubx_cfg_nav5, 43, 200) == HAL_BUSY){
+			printf("LOL");
+	}
+	HAL_Delay(1);
+
+}
+
+
 void ChecksumUBLOX(uint8_t *data){
 	unsigned i, j;
 	uint8_t a = 0, b = 0;
@@ -86,15 +110,15 @@ void ChecksumUBLOX(uint8_t *data){
 	j = ((unsigned)data[4] + ((unsigned)data[5] << 8) + 6);
 
 	for(i = 2; i < j; i++){
-	a += data[i];
-	b += a;
+		a += data[i];
+		b += a;
 	}
-	data[i+0] = a;
-	data[i+1] = b;
+	data[i] = a;
+	data[++i] = b;
 }
 
 /* Pass uint8_t of received data */
-void GPS_Receive(uint8_t data){
+void GPS_Receive(uint8_t *data){
 	if(data == '$'){
 		gpsTempLen = 0;
 	}else if((data == 13 || data == 10) && gpsTempLen != 255){ // looks for new_line or vertical tab
@@ -104,6 +128,17 @@ void GPS_Receive(uint8_t data){
 		gpsTemp[gpsTempLen] = data;
 		gpsTempLen++;
 	}
+}
+
+uint8_t parse_comma_delimited_str(uint8_t *string, uint8_t **fields, uint8_t max_fields)
+{
+	uint8_t i = 0;
+   fields[i++] = string;
+   while ((i < max_fields) && NULL != (string = strchr((char *)string, ','))) {
+      *string = '\0';
+      fields[i++] = ++string;
+   }
+   return --i;
 }
 
 /* parses received frame */
@@ -172,8 +207,6 @@ uint8_t GPS_Parse(uint8_t *buf, uint8_t len){
 		}else{
 			return GPS_NOK;
 		}
-
-
 	}else if(strncmp("GPVTG", (char *)buf, 5) == 0){ // get speed in km/h
 		if(GPS_CheckSum(buf, len) == GPS_OK){
 			uint8_t step = 0;

@@ -150,7 +150,6 @@ uint8_t charToInt(char* c);
 #define GSM_RST_GPIO_Port GPIOB
 #define GSM_RTS_Pin GPIO_PIN_9
 #define GSM_RTS_GPIO_Port GPIOB
-static void MX_USART1_UART_Init_2(void);
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
