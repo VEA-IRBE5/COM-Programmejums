@@ -46,7 +46,6 @@ void GPS_GetYear(uint8_t *buf);
 void GPS_GetMonth(uint8_t *buf);
 void GPS_GetDate(uint8_t *buf);
 void GPS_GetTime(uint8_t *buf);
-uint8_t GSM_InitUart(UART_HandleTypeDef *huart);
 void GPS_init_baudrate(uint8_t port, uint8_t inProto, uint8_t outProto, uint32_t baud_rate, uint8_t autobaud_ing);
 void Get_Navigation_Engine_Settings(); // 20 byte response
 void Set_Navigation_Engine_To_Airborne(void);
@@ -60,6 +59,7 @@ uint8_t GPS_HexToByte(uint8_t *hex, uint8_t *value);
 uint16_t UBX_Checksum(uint8_t *data, uint8_t size);
 void ChecksumUBLOX(uint8_t *data);
 size_t write_to_buffer(uint8_t *buffer, size_t size, uint8_t data);
+uint8_t GPS_init_Uart(UART_HandleTypeDef *huart);
 
 typedef struct{
 	uint16_t dig_T1; // adrese: 0x88 / 0x89

@@ -114,8 +114,8 @@ uint8_t ret = 0;
 uint8_t loraBuf[10] = {0};
 uint8_t buffer[15] = {0};
 uint8_t message[] = "&&\"/1,2.3--mini--salamini--desinas--1.2,3/\"";
-uint8_t ready_to_receive[8] = "##ready&";
-uint8_t not_to_receive[8] = "#nready&";
+uint8_t receiving[8] = "##ready&";
+uint8_t not_receiving[8] = "#nready&";
 uint8_t ok_ack_message[8] = "#ok_act*";
 uint8_t nok_ack_message[8] = "#nok_act";
 uint8_t mode = 1;
@@ -136,7 +136,7 @@ uint8_t do_send_tm = 1;
 uint8_t doSendGSM = 0;
 uint8_t receive_data = 0;
 
-uint8_t sec_gps = 0;
+uint8_t sec_listening = 0;
 uint8_t sec_lora_rec = 0;
 
 //Timer things
@@ -149,7 +149,7 @@ uint8_t UART6_DataBuf[50] = {0};
 uint8_t UART6_RxBuf[50] = {0};
 uint8_t UART6_RxBytes = 4;
 
-uint8_t hallo[255];
+uint8_t hallo[512];
 //UART
 
 /* USER CODE END 0 */
@@ -212,12 +212,10 @@ int main(void)
  SX1278_hw.spi = &hspi1;
  SX1278.hw = &SX1278_hw;
 
- //HAL_UART_Receive_DMA(&huart1, &rxBuf, 1); DOESN"T work for some reason
+
 // HAL_UART_Receive_IT(&huart1, &rxBuf, 1); // Works like a charm, but not as good as DMA
  //while(HAL_GPIO_ReadPin(RX_GPIO_Port, RX_Pin) == 0);
  //HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
-
- //HAL_UART_Receive_IT(&huart2, UART6_RxBuf, 2);
 
  HAL_GPIO_WritePin(RF_RST_GPIO_Port, RF_RST_Pin, GPIO_PIN_SET); // very important.
 
@@ -257,37 +255,29 @@ int main(void)
 //	GPS_GetMonth(month);
 //	GPS_GetDate(date);
 	GPS_GetTime(time);
-	UART6_TxBuf[0] = 0x02;
-	UART6_TxBuf[1] = 5;
-	UART6_TxBuf[2] = '*';
-	UART6_TxBuf[3] = get_check_sum((char *)UART6_TxBuf);
-	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, 4);
-	memset(UART6_TxBuf, 0, sizeof(UART6_TxBuf));
-	UART6_TxBuf[0] = charToInt((char *)&(time[6]));
-	UART6_TxBuf[1] = charToInt((char *)&(time[3]));
-	UART6_TxBuf[2] = charToInt((char *)&(time[0]));
-	UART6_TxBuf[3] = '*';
-	UART6_TxBuf[4] = get_check_sum((char *)UART6_TxBuf);
-	//snprintf(UART6_TxBuf, sizeof(UART6_TxBuf), "*%s%s%s", charToInt(&(time[6])), charToInt(&(time[3])), charToInt(&(time[0]))/*, charToInt(date), charToInt(month), charToInt(year)*/);
-	//snprintf(UART6_TxBuf + strlen((char *) UART6_TxBuf), sizeof(UART6_TxBuf) - strlen((char *) UART6_TxBuf), "*%s", get_check_sum(UART6_TxBuf));
-	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
-	memset(UART6_TxBuf, 0, sizeof(UART6_TxBuf));
-	UART6_TxBuf[0] = 0x42;
-	UART6_TxBuf[1] = 0x88;
-	UART6_TxBuf[2] = '*';
-	UART6_TxBuf[3] = get_check_sum((char *)UART6_TxBuf);
-	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
+//	UART6_TxBuf[0] = 0x02;
+//	UART6_TxBuf[1] = 5;
+//	UART6_TxBuf[2] = '*';
+//	UART6_TxBuf[3] = crc_xor((char *)UART6_TxBuf);
+//	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, 4);
+//	memset(UART6_TxBuf, 0, sizeof(UART6_TxBuf));
+//	UART6_TxBuf[0] = charToInt((char *)&(time[6]));
+//	UART6_TxBuf[1] = charToInt((char *)&(time[3]));
+//	UART6_TxBuf[2] = charToInt((char *)&(time[0]));
+//	UART6_TxBuf[3] = '*';
+//	UART6_TxBuf[4] = crc_xor((char *)UART6_TxBuf);
+//	//snprintf(UART6_TxBuf, sizeof(UART6_TxBuf), "*%s%s%s", charToInt(&(time[6])), charToInt(&(time[3])), charToInt(&(time[0]))/*, charToInt(date), charToInt(month), charToInt(year)*/);
+//	//snprintf(UART6_TxBuf + strlen((char *) UART6_TxBuf), sizeof(UART6_TxBuf) - strlen((char *) UART6_TxBuf), "*%s", crc_xor(UART6_TxBuf));
+//	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
+//	memset(UART6_TxBuf, 0, sizeof(UART6_TxBuf));
+//	UART6_TxBuf[0] = 0x42;
+//	UART6_TxBuf[1] = 0x88;
+//	UART6_TxBuf[2] = '*';
+//	UART6_TxBuf[3] = crc_xor((char *)UART6_TxBuf);
+//	HAL_UART_Transmit_IT(&huart6, UART6_TxBuf, strlen((char *)UART6_TxBuf));
 	memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
 	HAL_ADC_MspInit(&hadc1);
-	if (HAL_ADC_Start(&hadc1) != HAL_OK){
-		return HAL_ERROR;
-	}
-	if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) != HAL_OK) {
-		return HAL_ERROR;
-	}
-	if((HAL_ADC_GetState(&hadc1) & HAL_ADC_STATE_REG_EOC) !=  HAL_ADC_STATE_REG_EOC){
-		return HAL_ERROR;
-	}
+
 	if(GPS_init_Uart(&huart1)){
 		return 0;
 	}
@@ -295,12 +285,15 @@ int main(void)
 	/* TODO with GPS module UART1
 	 * - Commands to change GPS modes Portable -> Airborne [IMPORTANT] - done
 	 * - Change baud rate from 9600 to 115200 [IMPORTANT] - done
-	 * - Pull data from GPS module (FULL INIT) - optimize [IMPORTANT]
+	 * - Pull data from GPS module (FULL INIT) - optimize [IMPORTANT] -half done
+	 * - GPS parsing [IMPORTANT]
 	 * - Improve codes readability for next years successors [SECONDARY]
 	 */
 
 	/* TODO with UART6 module
-	* - FIX communication with Borta dators [IMPORTANT] -- Jekabs/Rodrigo [WORST case only Rodrigo - 2 week deadline]
+	* - FIX communication with Borta dators [IMPORTANT] -- DONE
+	* - IMPROVE READABILITY [IMPORTANT]
+	* - Create functions for easier commanding (easy error checking and retries if crc wrong - once than raises issue flag) [IMPORTANT]
 	*/
 
 	/* TODO with COM PCB
@@ -333,11 +326,15 @@ int main(void)
 	ChecksumUBLOX(ubx_cfg_nav5);
 	HAL_UART_Transmit(&huart1, ubx_cfg_nav5, sizeof(ubx_cfg_nav5), 1000);
 
-	if (HAL_UART_Receive_DMA(&huart1, hallo, 255) != HAL_OK) {
-	    Error_Handler();
+//	if (HAL_UART_Receive_DMA(&huart1, hallo, 512) != HAL_OK) {
+//		Error_Handler();
+//	}
+	if (HAL_UART_Receive_DMA(&huart1, &rxBuf, 1) != HAL_OK) {
+		Error_Handler();
 	}
 
-//	while(GPS_IsData() == GPS_NOK);
+
+	while(GPS_IsData() == GPS_NOK);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -356,7 +353,7 @@ int main(void)
 		gsmRec = 0;
 		//HAL_TIM_Base_Start_IT(&htim5);
 	}
-	if(do_send_tm){ // its time to send gps coordinates
+	if(do_send_tm){ // TIME TO SEND TELEMETRY
 		 for(uint8_t tries = 0; tries < 5; tries++){
 			 UART6_RxBytes = 4;
 			 HAL_UART_Receive_IT(&huart6, UART6_RxBuf, UART6_RxBytes);
@@ -377,16 +374,16 @@ int main(void)
 		 HAL_TIM_Base_Start_IT(&htim2);
 	}
 	if(receive_data){
-		if(sec_gps == 0){
-			SX1278_FSK_TxPacket(&SX1278, ready_to_receive, 8, 100);
+		if(sec_listening == 0){
+			SX1278_FSK_TxPacket(&SX1278, receiving, 8, 100);
 			SX1278_FSK_EntryRx(&SX1278, 8);
 			HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, GPIO_PIN_SET);
-		}else if(sec_gps >= 5){
+		}else if(sec_listening >= 5){
 			do_send_tm = 1;		// should send TM data
 			receive_data = 0;
-			sec_gps = 0;
+			sec_listening = 0;
 			HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, GPIO_PIN_RESET);
-			SX1278_FSK_TxPacket(&SX1278, not_to_receive, 8, 100);
+			SX1278_FSK_TxPacket(&SX1278, not_receiving, 8, 100);
 			HAL_TIM_Base_Stop_IT(&htim2);
 		}
 		if(loraModuleIrq){
@@ -990,10 +987,10 @@ uint8_t CMD_Parse(uint8_t *buf, uint8_t len){
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	if(huart == &huart1){
 		//HAL_UART_Receive_IT(&huart1, &rxBuf, 1);
-		HAL_UART_Receive_DMA(&huart1, hallo, 255);
+		//HAL_UART_Receive_DMA(&huart1, hallo, 512);
 		//GPS_Receive(hallo);
-		//GPS_Receive(rxBuf);
-		//HAL_UART_Receive_DMA(&huart1, &rxBuf, 1);
+		GPS_Receive(rxBuf);
+		HAL_UART_Receive_DMA(&huart1, &rxBuf, 1);
 	}
 
 	if(huart == &huart6){
@@ -1056,10 +1053,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart){
-	//HAL_UART_Receive_DMA(&huart1, &rxBuf, 1); doesn't work for some reason...
 	if(huart == &huart1){
 		//HAL_UART_Receive_IT(&huart1, &rxBuf, 1);
-		HAL_UART_Receive_DMA(&huart1, hallo, 255);
+		//HAL_UART_Receive_DMA(&huart1, hallo, 512);
+		HAL_UART_Receive_DMA(&huart1, &rxBuf, 1);
 	}
 	if(huart == &huart6){
 		memset(UART6_RxBuf, 0, sizeof(UART6_RxBuf));
@@ -1089,7 +1086,7 @@ void MODE_Set(SX1278_t * module, uint8_t mode){
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM2){
-		sec_gps++;
+		sec_listening++;
 	}
 
 	if(htim->Instance == TIM3){
@@ -1140,13 +1137,6 @@ void RTTY_SendSingle(SX1278_t * module, uint8_t buf, uint8_t timeout){
 	SX1278_RTTY_Stop(module);
 }
 
-uint8_t get_check_sum(char *string){
-	uint8_t XOR = 0;
-	for(uint8_t i = 1; i < strlen(string); i++) {
-		XOR = XOR ^ string[i];
-	}
-	return XOR;
-}
 uint8_t crc_xor(char *string){
 	uint8_t XOR = 0;
 	for(uint8_t i = 0; string[i] != '*' && i < strlen(string); i++){
@@ -1180,7 +1170,7 @@ void make_string(char *s, uint8_t size){
 	snprintf(s, size, "\r\n$$IRBE5,%li,%s,%s,%s,%s,%s,%s,%.2f", ++num, time, lat, lon, hei, spe, UART6_DataBuf, temp_mcu());
 	uint8_t l = strlen((char *)s);
 	char *ptr = strrchr(s, '$');
-	if(snprintf(s + l, size - l, "*%02x\r\n", get_check_sum(ptr))  > size - 4 - 1){
+	if(snprintf(s + l, size - l, "*%02x\r\n", crc_xor(++ptr))  > size - 4 - 1){
 		//buffer overflow
 		return;
 	}
@@ -1206,17 +1196,26 @@ void make_string_gsm(char *s, uint8_t size){
 }
 
 float temp_mcu(void){
-	  float TemperatureValue = 0;
-	  uint16_t value = 0;
-	  value = HAL_ADC_GetValue(&hadc1);
-	  TemperatureValue = value & 0x0fff;// 12 bit result
-	  TemperatureValue *= 3300;
-	  TemperatureValue /= 0xfff; //Reading in mV
-	  TemperatureValue /= 1000.0; //Reading in Volts
-	  TemperatureValue -= 0.760; // Subtract the reference voltage at 25�C
-	  TemperatureValue /= .0025; // Divide by slope 2.5mV
-	  TemperatureValue += 25.0; // Add the 25�C
-	  return TemperatureValue;
+	float TemperatureValue = 0;
+	uint16_t value = 0;
+	if (HAL_ADC_Start(&hadc1) != HAL_OK){
+		return HAL_ERROR;
+	}
+	if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) != HAL_OK) {
+		return HAL_ERROR;
+	}
+	if((HAL_ADC_GetState(&hadc1) & HAL_ADC_STATE_REG_EOC) !=  HAL_ADC_STATE_REG_EOC){
+		return HAL_ERROR;
+	}
+	value = HAL_ADC_GetValue(&hadc1);
+	TemperatureValue = value & 0x0fff;// 12 bit result
+	TemperatureValue *= 3300;
+	TemperatureValue /= 0xfff; //Reading in mV
+	TemperatureValue /= 1000.0; //Reading in Volts
+	TemperatureValue -= 0.760; // Subtract the reference voltage at 25�C
+	TemperatureValue /= .0025; // Divide by slope 2.5mV
+	TemperatureValue += 25.0; // Add the 25�C
+	return TemperatureValue;
   }
 uint8_t charToInt(char* c){
 	uint8_t num = {0};
